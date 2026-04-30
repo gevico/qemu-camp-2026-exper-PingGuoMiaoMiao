@@ -57,6 +57,54 @@ G_NORETURN void riscv_raise_exception(CPURISCVState *env,
     cpu_loop_exit_restore(cs, pc);
 }
 
+void helper_sort(CPURISCVState *env, target_ulong addr,
+                 target_ulong n, target_ulong k)
+{
+    uintptr_t ra = GETPC();
+    int mmu_idx = riscv_env_mmu_index(env, false);
+    int32_t *buf;
+    target_ulong i, j;
+
+    /*
+     * sort: INT32 array ascending bubble sort, with partial sorting support.
+     *
+     * A = mem at gpr[rs1]                           // INT32 array
+     * N = gpr[rs2]                                  // total elements (upper bound)
+     * K = gpr[rd]                                   // elements to sort
+     * for i in 0..K-2:
+     *     for j in 0..K-i-2:
+     *         if A[j] > A[j+1]:
+     *             swap(A[j], A[j+1])
+     *
+     * Only the first K elements participate in sorting.
+     * All N elements are written back (K elements sorted, rest unchanged).
+     */
+
+    /* Read all N elements from memory */
+    buf = g_malloc(n * sizeof(int32_t));
+    for (i = 0; i < n; i++) {
+        buf[i] = (int32_t)cpu_ldl_mmuidx_ra(env, addr + i * 4, mmu_idx, ra);
+    }
+
+    /* Bubble sort the first K elements */
+    for (i = 0; i < k - 1; i++) {
+        for (j = 0; j < k - i - 1; j++) {
+            if (buf[j] > buf[j + 1]) {
+                int32_t tmp = buf[j];
+                buf[j] = buf[j + 1];
+                buf[j + 1] = tmp;
+            }
+        }
+    }
+
+    /* Write all N elements back */
+    for (i = 0; i < n; i++) {
+        cpu_stl_mmuidx_ra(env, addr + i * 4, buf[i], mmu_idx, ra);
+    }
+
+    g_free(buf);
+}
+
 void helper_raise_exception(CPURISCVState *env, uint32_t exception)
 {
     riscv_raise_exception(env, exception, 0);
@@ -173,6 +221,140 @@ static void check_zicbo_envcfg(CPURISCVState *env, target_ulong envbits,
         riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, ra);
     }
 #endif
+}
+
+void helper_dma(CPURISCVState *env, target_ulong dst_addr,
+                target_ulong src_addr, target_ulong grain)
+{
+    uintptr_t ra = GETPC();
+    int mmu_idx = riscv_env_mmu_index(env, false);
+    int n;
+    int i, j;
+
+    /*
+     * dma: FP32 matrix transpose
+     *
+     * Transpose an FP32 matrix in memory.
+     * grain=0: 8x8, grain=1: 16x16, grain=2: 32x32
+     *
+     * Equivalent C code:
+     *   for (i = 0; i < n; i++)
+     *       for (j = 0; j < n; j++)
+     *           dst[j * n + i] = src[i * n + j];
+     */
+    switch (grain) {
+    case 0:
+        n = 8;
+        break;
+    case 1:
+        n = 16;
+        break;
+    case 2:
+        n = 32;
+        break;
+    default:
+        riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, ra);
+        return;
+    }
+
+    for (i = 0; i < n; i++) {
+        for (j = 0; j < n; j++) {
+            uint32_t val = cpu_ldl_mmuidx_ra(env, src_addr + (i * n + j) * 4,
+                                             mmu_idx, ra);
+            cpu_stl_mmuidx_ra(env, dst_addr + (j * n + i) * 4, val,
+                              mmu_idx, ra);
+        }
+    }
+}
+
+void helper_crush(CPURISCVState *env, target_ulong dst_addr,
+                  target_ulong src_addr, target_ulong len)
+{
+    uintptr_t ra = GETPC();
+    int mmu_idx = riscv_env_mmu_index(env, false);
+    target_ulong i;
+
+    /*
+     * crush: 8-bit to 4-bit compression
+     *
+     * For each pair of bytes in memory at [src_addr], extract the low 4 bits
+     * of each byte and pack them into a single byte, storing the result
+     * at [dst_addr]. The number of source bytes is given by len.
+     *
+     * Equivalent C code:
+     *   for (i = 0; i < n/2; i++) {
+     *       dst[i]  = src[2*i]   & 0x0F;
+     *       dst[i] |= (src[2*i+1] & 0x0F) << 4;
+     *   }
+     *   if (n & 1) dst[n/2] = src[n-1] & 0x0F;
+     */
+    for (i = 0; i < len / 2; i++) {
+        uint8_t byte0 = cpu_ldub_mmuidx_ra(env, src_addr + 2 * i, mmu_idx, ra);
+        uint8_t byte1 = cpu_ldub_mmuidx_ra(env, src_addr + 2 * i + 1, mmu_idx, ra);
+        uint8_t packed = (byte0 & 0x0F) | ((byte1 & 0x0F) << 4);
+        cpu_stb_mmuidx_ra(env, dst_addr + i, packed, mmu_idx, ra);
+    }
+
+    if (len & 1) {
+        uint8_t last = cpu_ldub_mmuidx_ra(env, src_addr + len - 1, mmu_idx, ra);
+        cpu_stb_mmuidx_ra(env, dst_addr + len / 2, last & 0x0F, mmu_idx, ra);
+    }
+}
+
+void helper_expand(CPURISCVState *env, target_ulong dst_addr,
+                   target_ulong src_addr, target_ulong n)
+{
+    uintptr_t ra = GETPC();
+    int mmu_idx = riscv_env_mmu_index(env, false);
+    target_ulong i;
+
+    /*
+     * expand: 4-bit → 8-bit Decompress and expand
+     *
+     * Each source byte is split into two 4-bit elements.
+     * src = UINT8 array, N elements
+     * dst = UINT8 array, 2*N elements
+     *
+     * Equivalent C code:
+     *   for i in 0..N-1:
+     *       dst[2*i]     = src[i] & 0x0F
+     *       dst[2*i + 1] = (src[i] >> 4) & 0x0F
+     */
+    for (i = 0; i < n; i++) {
+        uint8_t src_byte = cpu_ldub_mmuidx_ra(env, src_addr + i, mmu_idx, ra);
+        uint8_t lo = src_byte & 0x0F;
+        uint8_t hi = (src_byte >> 4) & 0x0F;
+        cpu_stb_mmuidx_ra(env, dst_addr + 2 * i, lo, mmu_idx, ra);
+        cpu_stb_mmuidx_ra(env, dst_addr + 2 * i + 1, hi, mmu_idx, ra);
+    }
+}
+
+target_ulong helper_vdot(CPURISCVState *env, target_ulong addr_a,
+                         target_ulong addr_b)
+{
+    uintptr_t ra = GETPC();
+    int mmu_idx = riscv_env_mmu_index(env, false);
+    int i;
+    int64_t acc = 0;
+
+    /*
+     * vdot: INT32 vector dot product
+     *
+     * A = mem at gpr[rs1]                           // INT32[16]
+     * B = mem at gpr[rs2]                           // INT32[16]
+     * acc = 0                                       // INT64 accumulator
+     * for i in 0..15:
+     *     acc += (INT64)A[i] * (INT64)B[i]
+     * gpr[rd] = acc[XLEN-1:0]                      // truncate to XLEN
+     */
+    for (i = 0; i < 16; i++) {
+        int32_t a = (int32_t)cpu_ldl_mmuidx_ra(env, addr_a + i * 4, mmu_idx, ra);
+        int32_t b = (int32_t)cpu_ldl_mmuidx_ra(env, addr_b + i * 4, mmu_idx, ra);
+        acc += (int64_t)a * (int64_t)b;
+    }
+
+    /* Return the truncated result to be written to gpr[rd] */
+    return (target_ulong)(int32_t)acc;
 }
 
 void helper_cbo_zero(CPURISCVState *env, target_ulong address)

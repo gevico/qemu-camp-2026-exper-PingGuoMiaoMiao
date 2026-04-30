@@ -70,4 +70,9 @@ MATERIALISE_EXT_PREDICATE(xtheadmempair)
 MATERIALISE_EXT_PREDICATE(xtheadsync)
 MATERIALISE_EXT_PREDICATE(XVentanaCondOps)
 
+static inline bool has_xg233ai_p(const RISCVCPUConfig *cfg)
+{
+    return cfg->ext_xg233ai;
+}
+
 #endif

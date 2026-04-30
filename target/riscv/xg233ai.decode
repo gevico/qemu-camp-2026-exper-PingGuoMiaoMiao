@@ -1,0 +1,40 @@
+#
+# RISC-V translation routines for the Gevico Xg233ai extension
+#
+# Copyright (c) 2025 Gevico
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+# Fields
+%rs2       20:5
+%rs1       15:5
+%rd        7:5
+
+# Argument sets
+&xg233ai_r    rd rs1 rs2
+
+# Formats
+@xg233ai_r ....... ..... ..... ... ..... ....... &xg233ai_r %rs2 %rs1 %rd
+
+# *** Xg233ai Extension ***
+# crush: 8-bit to 4-bit compression
+# .insn r 0x7b, 6, 38, rd, rs1, rs2
+crush       0100110 ..... ..... 110 ..... 1111011 @xg233ai_r
+
+# dma: FP32 matrix transpose
+# .insn r 0x7b, 6, 6, rd, rs1, rs2
+#   grain=0: 8x8, grain=1: 16x16, grain=2: 32x32
+dma         0000110 ..... ..... 110 ..... 1111011 @xg233ai_r
+
+# sort: INT32 array ascending bubble sort, with partial sorting support.
+# .insn r 0x7b, 6, 6, rd, rs1, rs2
+sort        0010110 ..... ..... 110 ..... 1111011 @xg233ai_r
+
+# expand: Decompress and expand, each byte is split into two 4-bit elements.
+# .insn r 0x7b, 6, 6, rd, rs1, rs2
+expand      0110110 ..... ..... 110 ..... 1111011 @xg233ai_r
+
+# vdot：Calculate the dot product of two INT32 vectors and write the result to the target register. 
+# This is a core operation in the fully connected layers and attention mechanisms of neural networks.
+# .insn r 0x7b, 6, 6, rd, rs1, rs2
+vdot        1000110 ..... ..... 110 ..... 1111011 @xg233ai_r
