@@ -174,6 +174,8 @@ static bool trans_vrelu(DisasContext *ctx, arg_vrelu *a)
  *   N     = 16                                    // fixed vector length
  *   for i in 0..N-1:
  *       dst[i] = (INT32)((INT64)src[i] * scale)   // multiply, truncate to 32-bit
+ *
+ * Optimized: fully unrolled TCG inline code for better performance.
  */
 static bool trans_vscale(DisasContext *ctx, arg_vscale *a)
 {
@@ -181,8 +183,28 @@ static bool trans_vscale(DisasContext *ctx, arg_vscale *a)
     TCGv src_addr = get_gpr(ctx, a->rs1, EXT_NONE);
     TCGv dst_addr = get_gpr(ctx, a->rd, EXT_NONE);
     TCGv scale = get_gpr(ctx, a->rs2, EXT_NONE);
+    TCGv t0 = tcg_temp_new();
+    TCGv t1 = tcg_temp_new();
+    TCGv t_addr = tcg_temp_new();
+    int i;
 
-    gen_helper_vscale(tcg_env, dst_addr, src_addr, scale);
+    for (i = 0; i < 16; i++) {
+        /* Load src[i] */
+        tcg_gen_addi_tl(t_addr, src_addr, i * 4);
+        tcg_gen_qemu_ld_tl(t0, t_addr, ctx->mem_idx, MO_TESL);
+
+        /* dst[i] = (INT32)((INT64)src[i] * scale)
+         * Use 64-bit multiply and truncate to 32-bit.
+         * t0 is sign-extended to TCGv (64-bit on RV64, 32-bit on RV32).
+         * On RV64: t0 is already 64-bit sign-extended from 32-bit load.
+         * On RV32: we need to do 64-bit multiply.
+         */
+        tcg_gen_mul_tl(t1, t0, scale);
+
+        /* Store result (truncated to 32-bit via MO_TESL store) */
+        tcg_gen_addi_tl(t_addr, dst_addr, i * 4);
+        tcg_gen_qemu_st_tl(t1, t_addr, ctx->mem_idx, MO_TESL);
+    }
 
     return true;
 }
@@ -248,16 +270,38 @@ static bool trans_gemm(DisasContext *ctx, arg_gemm *a)
  *   C = mem at gpr[rd]                            // INT32[16]
  *   for i in 0..15:
  *       C[i] = A[i] + B[i]                        // INT32 wrapping add
+ *
+ * Optimized: fully unrolled TCG inline code for better performance.
  */
 static bool trans_vadd(DisasContext *ctx, arg_vadd *a)
 {
     REQUIRE_XG233AI(ctx);
 
-    TCGv dst_addr = get_gpr(ctx, a->rd, EXT_NONE);
     TCGv addr_a = get_gpr(ctx, a->rs1, EXT_NONE);
     TCGv addr_b = get_gpr(ctx, a->rs2, EXT_NONE);
+    TCGv addr_d = get_gpr(ctx, a->rd, EXT_NONE);
+    TCGv t0 = tcg_temp_new();
+    TCGv t1 = tcg_temp_new();
+    TCGv t_sum = tcg_temp_new();
+    TCGv t_addr = tcg_temp_new();
+    int i;
 
-    gen_helper_vadd(tcg_env, dst_addr, addr_a, addr_b);
+    for (i = 0; i < 16; i++) {
+        /* Load A[i] */
+        tcg_gen_addi_tl(t_addr, addr_a, i * 4);
+        tcg_gen_qemu_ld_tl(t0, t_addr, ctx->mem_idx, MO_TESL);
+
+        /* Load B[i] */
+        tcg_gen_addi_tl(t_addr, addr_b, i * 4);
+        tcg_gen_qemu_ld_tl(t1, t_addr, ctx->mem_idx, MO_TESL);
+
+        /* sum = A[i] + B[i] */
+        tcg_gen_add_tl(t_sum, t0, t1);
+
+        /* Store to C[i] */
+        tcg_gen_addi_tl(t_addr, addr_d, i * 4);
+        tcg_gen_qemu_st_tl(t_sum, t_addr, ctx->mem_idx, MO_TESL);
+    }
 
     return true;
 }

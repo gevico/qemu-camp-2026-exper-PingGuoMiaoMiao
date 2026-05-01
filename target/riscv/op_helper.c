@@ -379,31 +379,6 @@ void helper_vrelu(CPURISCVState *env, target_ulong dst_addr,target_ulong src_add
     }
 }
 
-void helper_vscale(CPURISCVState *env, target_ulong dst_addr,
-                   target_ulong src_addr, target_ulong scale)
-{
-    uintptr_t ra = GETPC();
-    int mmu_idx = riscv_env_mmu_index(env, false);
-    int N = 16;
-    target_ulong i;
-
-    /*
-     * vscale: INT32 vector scaling
-     *
-     * src   = mem at gpr[rs1]                       // INT32 array
-     * dst   = mem at gpr[rd]                        // INT32 array
-     * scale = gpr[rs2]                              // scalar multiplier (register value)
-     * N     = 16                                    // fixed vector length
-     * for i in 0..N-1:
-     *     dst[i] = (INT32)((INT64)src[i] * scale)   // multiply, truncate to 32-bit
-     */
-    for (i = 0; i < N; i++) {
-        int32_t src_val = (int32_t)cpu_ldl_mmuidx_ra(env, src_addr + i * 4, mmu_idx, ra);
-        int64_t scaled = (int64_t)src_val * (int64_t)(int32_t)scale;
-        cpu_stl_mmuidx_ra(env, dst_addr + i * 4, (int32_t)scaled, mmu_idx, ra);
-    }
-}
-
 target_ulong helper_vmax(CPURISCVState *env, target_ulong addr, target_ulong N)
 {
     uintptr_t ra = GETPC();
@@ -484,31 +459,6 @@ void helper_gemm(CPURISCVState *env, target_ulong dst_addr,
         for (j = 0; j < 4; j++) {
             cpu_stl_mmuidx_ra(env, dst_addr + (i * 4 + j) * 4, C[i][j], mmu_idx, ra);
         }   
-    }
-}
-
-void helper_vadd(CPURISCVState *env, target_ulong rd, target_ulong rs1, target_ulong rs2)
-{
-    uintptr_t ra = GETPC();
-    int mmu_idx = riscv_env_mmu_index(env, false);
-    int N = 16;
-    target_ulong i;
-
-    /*
-     * vadd: INT32 vector addition
-     *
-     * dst = mem at gpr[rd]                        // INT32 array
-     * src1 = mem at gpr[rs1]                      // INT32 array
-     * src2 = mem at gpr[rs2]                      // INT32 array
-     * N = 16                                    // fixed vector length
-     * for i in 0..N-1:
-     *     dst[i] = src1[i] + src2[i]
-     */
-    for (i = 0; i < N; i++) {
-        int32_t val1 = (int32_t)cpu_ldl_mmuidx_ra(env, rs1 + i * 4, mmu_idx, ra);
-        int32_t val2 = (int32_t)cpu_ldl_mmuidx_ra(env, rs2 + i * 4, mmu_idx, ra);
-        int32_t sum = val1 + val2;
-        cpu_stl_mmuidx_ra(env, rd + i * 4, sum, mmu_idx, ra);
     }
 }
 

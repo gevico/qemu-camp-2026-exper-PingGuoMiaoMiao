@@ -803,6 +803,9 @@ coref = []
 iokit = []
 pvg = not_found
 emulator_link_args = []
+if get_option('plugins')
+  emulator_link_args += cc.get_supported_link_arguments('-Wl,--export-dynamic')
+endif
 midl = not_found
 widl = not_found
 pathcch = not_found
