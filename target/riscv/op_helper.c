@@ -438,6 +438,55 @@ target_ulong helper_vmax(CPURISCVState *env, target_ulong addr, target_ulong N)
     return (target_ulong)(int32_t)max_val;
 }
 
+void helper_gemm(CPURISCVState *env, target_ulong dst_addr,
+                 target_ulong src_a_addr, target_ulong src_b_addr)
+{
+    uintptr_t ra = GETPC();
+    int mmu_idx = riscv_env_mmu_index(env, false);
+    int i, j, k;
+    int32_t A[4][4], B[4][4], C[4][4];
+
+    /*
+     * gemm: FP32 4x4 matrix multiplication
+     *
+     * C = mem at gpr[rd]                        // FP32 4x4 output matrix
+     * A = mem at gpr[rs1]                       // FP32 4x4 input matrix A
+     * B = mem at gpr[rs2]                       // FP32 4x4 input matrix B
+     * for i in 0..3:
+     *   for j in 0..3:
+     *     acc = 0.0
+     *     for k in 0..3:
+     *       acc += (FP32)A[i][k] * (FP32)B[k][j]
+     *     C[i][j] = acc
+     */
+
+    /* Load A and B from memory */
+    for (i = 0; i < 4; i++) {
+        for (j = 0; j < 4; j++) {
+            A[i][j] = (int32_t)cpu_ldl_mmuidx_ra(env, src_a_addr + (i * 4 + j) * 4, mmu_idx, ra);
+            B[i][j] = (int32_t)cpu_ldl_mmuidx_ra(env, src_b_addr + (i * 4 + j) * 4, mmu_idx, ra);
+        }
+    }
+
+    /* Compute C = A x B */
+    for (i = 0; i < 4; i++) {
+        for (j = 0; j < 4; j++) {
+            int64_t acc = 0;
+            for (k = 0; k < 4; k++) {
+                acc += (int64_t)A[i][k] * (int64_t)B[k][j];
+            }
+            C[i][j] = (int32_t)acc;
+        }
+    }
+
+    /* Store C back to memory */
+    for (i = 0; i < 4; i++) {
+        for (j = 0; j < 4; j++) {
+            cpu_stl_mmuidx_ra(env, dst_addr + (i * 4 + j) * 4, C[i][j], mmu_idx, ra);
+        }   
+    }
+}
+
 void helper_cbo_zero(CPURISCVState *env, target_ulong address)
 {
     RISCVCPU *cpu = env_archcpu(env);

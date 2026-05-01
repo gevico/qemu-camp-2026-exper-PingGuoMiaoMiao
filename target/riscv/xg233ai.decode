@@ -53,3 +53,8 @@ vscale        1100110 ..... ..... 110 ..... 1111011 @xg233ai_r
 # Find the maximum value in the INT32 array and write the result to the target register. Used for max pooling and argmax operations.
 # .insn r 0x7b, 6, 6, rd, rs1, rs2
 vmax        1110110 ..... ..... 110 ..... 1111011 @xg233ai_r
+
+# vmax ：INT32 4×4 matrix multiplication¶
+# Calculate the product of two 4×4 INT32 matrices, C = A × B, and write the result to the target address. Matrix multiplication is a fundamental operation in the linear layers of neural networks and the attention mechanism of the Transformer.
+# .insn r 0x7b, 6, 6, rd, rs1, rs2
+gemm       0001110 ..... ..... 110 ..... 1111011 @xg233ai_r

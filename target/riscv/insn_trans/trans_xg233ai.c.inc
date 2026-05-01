@@ -211,3 +211,30 @@ static bool trans_vmax(DisasContext *ctx, arg_vmax *a)
 
     return true;
 }
+
+
+/*
+ * gemm: INT32 4×4 matrix multiplication
+ *
+ * Synopsis: gemm rd, rs1, rs2
+ *   A = mem at gpr[rs1]                           // INT32[4][4], row-major
+ *   B = mem at gpr[rs2]                           // INT32[4][4], row-major
+ *   C = mem at gpr[rd]                            // INT32[4][4], row-major
+ *   for i in 0..3:
+ *       for j in 0..3:
+ *           acc = 0                               // INT64 accumulator
+ *           for k in 0..3:
+ *               acc += (INT64)A[i][k] * (INT64)B[k][j]
+ *           C[i][j] = (INT32)acc
+ */
+static bool trans_gemm(DisasContext *ctx, arg_gemm *a)
+{
+    REQUIRE_XG233AI(ctx);
+    TCGv C = get_gpr(ctx, a->rd, EXT_NONE);
+    TCGv A = get_gpr(ctx, a->rs1, EXT_NONE);
+    TCGv B = get_gpr(ctx, a->rs2, EXT_NONE);
+
+    gen_helper_gemm(tcg_env, C, A, B);
+
+    return true;
+}
