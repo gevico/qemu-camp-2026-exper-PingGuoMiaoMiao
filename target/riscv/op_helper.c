@@ -379,6 +379,31 @@ void helper_vrelu(CPURISCVState *env, target_ulong dst_addr,target_ulong src_add
     }
 }
 
+void helper_vscale(CPURISCVState *env, target_ulong dst_addr,
+                   target_ulong src_addr, target_ulong scale)
+{
+    uintptr_t ra = GETPC();
+    int mmu_idx = riscv_env_mmu_index(env, false);
+    int N = 16;
+    target_ulong i;
+
+    /*
+     * vscale: INT32 vector scaling
+     *
+     * src   = mem at gpr[rs1]                       // INT32 array
+     * dst   = mem at gpr[rd]                        // INT32 array
+     * scale = gpr[rs2]                              // scalar multiplier (register value)
+     * N     = 16                                    // fixed vector length
+     * for i in 0..N-1:
+     *     dst[i] = (INT32)((INT64)src[i] * scale)   // multiply, truncate to 32-bit
+     */
+    for (i = 0; i < N; i++) {
+        int32_t src_val = (int32_t)cpu_ldl_mmuidx_ra(env, src_addr + i * 4, mmu_idx, ra);
+        int64_t scaled = (int64_t)src_val * (int64_t)(int32_t)scale;
+        cpu_stl_mmuidx_ra(env, dst_addr + i * 4, (int32_t)scaled, mmu_idx, ra);
+    }
+}
+
 void helper_cbo_zero(CPURISCVState *env, target_ulong address)
 {
     RISCVCPU *cpu = env_archcpu(env);

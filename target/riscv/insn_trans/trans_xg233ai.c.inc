@@ -163,3 +163,26 @@ static bool trans_vrelu(DisasContext *ctx, arg_vrelu *a)
 
     return true;
 }
+
+/*
+ * vscale: INT32 Vector scalar multiplication
+ *
+ * Synopsis: vscale rd, rs1, rs2
+ *   src   = mem at gpr[rs1]                       // INT32 array
+ *   dst   = mem at gpr[rd]                        // INT32 array
+ *   scale = gpr[rs2]                              // scalar multiplier (register value)
+ *   N     = 16                                    // fixed vector length
+ *   for i in 0..N-1:
+ *       dst[i] = (INT32)((INT64)src[i] * scale)   // multiply, truncate to 32-bit
+ */
+static bool trans_vscale(DisasContext *ctx, arg_vscale *a)
+{
+    REQUIRE_XG233AI(ctx);
+    TCGv src_addr = get_gpr(ctx, a->rs1, EXT_NONE);
+    TCGv dst_addr = get_gpr(ctx, a->rd, EXT_NONE);
+    TCGv scale = get_gpr(ctx, a->rs2, EXT_NONE);
+
+    gen_helper_vscale(tcg_env, dst_addr, src_addr, scale);
+
+    return true;
+}
