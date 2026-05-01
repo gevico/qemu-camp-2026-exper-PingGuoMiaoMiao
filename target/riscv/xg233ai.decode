@@ -38,3 +38,8 @@ expand      0110110 ..... ..... 110 ..... 1111011 @xg233ai_r
 # This is a core operation in the fully connected layers and attention mechanisms of neural networks.
 # .insn r 0x7b, 6, 6, rd, rs1, rs2
 vdot        1000110 ..... ..... 110 ..... 1111011 @xg233ai_r
+
+# vrelu：The ReLU activation function max(0, x) is applied element-wise to an INT32 array in memory, and the results are written to the target array. 
+# ReLU is the most common activation function in deep learning.
+# .insn r 0x7b, 6, 6, rd, rs1, rs2
+vrelu        1010110 ..... ..... 110 ..... 1111011 @xg233ai_r

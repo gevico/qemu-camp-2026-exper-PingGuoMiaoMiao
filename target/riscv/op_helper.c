@@ -357,6 +357,28 @@ target_ulong helper_vdot(CPURISCVState *env, target_ulong addr_a,
     return (target_ulong)(int32_t)acc;
 }
 
+void helper_vrelu(CPURISCVState *env, target_ulong dst_addr,target_ulong src_addr, target_ulong N)
+{
+    uintptr_t ra = GETPC();
+    int mmu_idx = riscv_env_mmu_index(env, false);
+    target_ulong i;
+
+    /*
+     * vrelu: INT32 vector ReLU
+     *
+     * dst = mem at gpr[rd]                           // INT32 array
+     * src = mem at gpr[rs1]                           // INT32 array
+     * N = gpr[rs2]                                  // number of elements
+     * for i in 0..N-1:
+     *     dst[i] = src[i] > 0 ? src[i] : 0
+     */
+    for (i = 0; i < N; i++) {
+        int32_t val = (int32_t)cpu_ldl_mmuidx_ra(env, src_addr + i * 4, mmu_idx, ra);
+        int32_t relu_val = val > 0 ? val : 0;
+        cpu_stl_mmuidx_ra(env, dst_addr + i * 4, relu_val, mmu_idx, ra);
+    }
+}
+
 void helper_cbo_zero(CPURISCVState *env, target_ulong address)
 {
     RISCVCPU *cpu = env_archcpu(env);

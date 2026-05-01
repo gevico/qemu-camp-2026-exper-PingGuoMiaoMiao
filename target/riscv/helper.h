@@ -127,7 +127,7 @@ DEF_HELPER_4(dma, void, env, tl, tl, tl)
 DEF_HELPER_4(sort, void, env, tl, tl, tl)
 DEF_HELPER_4(expand, void, env, tl, tl, tl)
 DEF_HELPER_3(vdot, tl, env, tl, tl)
-
+DEF_HELPER_4(vrelu, void, env, tl, tl, tl)
 
 /* Special functions */
 DEF_HELPER_2(csrr, tl, env, int)

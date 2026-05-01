@@ -141,3 +141,25 @@ static bool trans_vdot(DisasContext *ctx, arg_vdot *a)
 
     return true;
 }
+
+/*
+ * vrelu: INT32 vector dot product
+ *
+ * Synopsis: vrelu rd, rs1, rs2
+ *   src = mem at gpr[rs1]                         // INT32 array
+ *   dst = mem at gpr[rd]                          // INT32 array
+ *   N   = gpr[rs2]
+ *   for i in 0..N-1:
+ *   dst[i] = (src[i] > 0) ? src[i] : 0
+ */
+static bool trans_vrelu(DisasContext *ctx, arg_vrelu *a)
+{
+    REQUIRE_XG233AI(ctx);
+    TCGv src_addr = get_gpr(ctx, a->rs1, EXT_NONE);
+    TCGv dst_addr = get_gpr(ctx, a->rd, EXT_NONE);
+    TCGv N = get_gpr(ctx, a-> rs2, EXT_NONE);
+
+    gen_helper_vrelu(tcg_env, dst_addr, src_addr, N);
+
+    return true;
+}
