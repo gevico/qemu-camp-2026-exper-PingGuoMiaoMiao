@@ -186,3 +186,28 @@ static bool trans_vscale(DisasContext *ctx, arg_vscale *a)
 
     return true;
 }
+
+/*
+ * vmax: INT32 Vector Maximum Reduction
+ *
+ * Synopsis: vmax rd, rs1, rs2
+ *   A   = mem at gpr[rs1]                         // INT32 array
+ *   N   = gpr[rs2]                                 // number of elements
+ *   max = A[0]
+ *   for i in 1..N-1:
+ *       if A[i] > max:
+ *           max = A[i]
+ *   gpr[rd] = sign_extend(max, 32)                // sign-extend to XLEN
+ */
+static bool trans_vmax(DisasContext *ctx, arg_vmax *a)
+{
+    REQUIRE_XG233AI(ctx);
+    TCGv addr = get_gpr(ctx, a->rs1, EXT_NONE);
+    TCGv N = get_gpr(ctx, a->rs2, EXT_NONE);
+    TCGv ret = tcg_temp_new();
+
+    gen_helper_vmax(ret, tcg_env, addr, N);
+    gen_set_gpr(ctx, a->rd, ret);
+
+    return true;
+}

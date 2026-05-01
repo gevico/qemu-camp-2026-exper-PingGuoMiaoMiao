@@ -48,3 +48,8 @@ vrelu        1010110 ..... ..... 110 ..... 1111011 @xg233ai_r
 # ReLU is the most common activation function in deep learning.
 # .insn r 0x7b, 6, 6, rd, rs1, rs2
 vscale        1100110 ..... ..... 110 ..... 1111011 @xg233ai_r
+
+# vmax ：INT32 Vector Maximum Reduction
+# Find the maximum value in the INT32 array and write the result to the target register. Used for max pooling and argmax operations.
+# .insn r 0x7b, 6, 6, rd, rs1, rs2
+vmax        1110110 ..... ..... 110 ..... 1111011 @xg233ai_r

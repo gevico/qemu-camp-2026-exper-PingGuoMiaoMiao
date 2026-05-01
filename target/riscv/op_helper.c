@@ -404,6 +404,40 @@ void helper_vscale(CPURISCVState *env, target_ulong dst_addr,
     }
 }
 
+target_ulong helper_vmax(CPURISCVState *env, target_ulong addr, target_ulong N)
+{
+    uintptr_t ra = GETPC();
+    int mmu_idx = riscv_env_mmu_index(env, false);
+    target_ulong i;
+    int32_t max_val;
+
+    /*
+     * vmax: INT32 vector maximum reduction
+     *
+     * A   = mem at gpr[rs1]                         // INT32 array
+     * N   = gpr[rs2]                                 // number of elements
+     * max = A[0]
+     * for i in 1..N-1:
+     *     if A[i] > max:
+     *         max = A[i]
+     * gpr[rd] = sign_extend(max, 32)                // sign-extend to XLEN
+     */
+
+    /* Read first element as initial max */
+    max_val = (int32_t)cpu_ldl_mmuidx_ra(env, addr, mmu_idx, ra);
+
+    /* Scan remaining elements */
+    for (i = 1; i < N; i++) {
+        int32_t val = (int32_t)cpu_ldl_mmuidx_ra(env, addr + i * 4, mmu_idx, ra);
+        if (val > max_val) {
+            max_val = val;
+        }
+    }
+
+    /* Return sign-extended 32-bit result */
+    return (target_ulong)(int32_t)max_val;
+}
+
 void helper_cbo_zero(CPURISCVState *env, target_ulong address)
 {
     RISCVCPU *cpu = env_archcpu(env);
