@@ -44,7 +44,7 @@ vdot        1000110 ..... ..... 110 ..... 1111011 @xg233ai_r
 # .insn r 0x7b, 6, 6, rd, rs1, rs2
 vrelu        1010110 ..... ..... 110 ..... 1111011 @xg233ai_r
 
-# vrelu：The ReLU activation function max(0, x) is applied element-wise to an INT32 array in memory, and the results are written to the target array. 
+# vscale：The ReLU activation function max(0, x) is applied element-wise to an INT32 array in memory, and the results are written to the target array. 
 # ReLU is the most common activation function in deep learning.
 # .insn r 0x7b, 6, 6, rd, rs1, rs2
 vscale        1100110 ..... ..... 110 ..... 1111011 @xg233ai_r
@@ -54,7 +54,12 @@ vscale        1100110 ..... ..... 110 ..... 1111011 @xg233ai_r
 # .insn r 0x7b, 6, 6, rd, rs1, rs2
 vmax        1110110 ..... ..... 110 ..... 1111011 @xg233ai_r
 
-# vmax ：INT32 4×4 matrix multiplication¶
+# gemm ：INT32 4×4 matrix multiplication¶
 # Calculate the product of two 4×4 INT32 matrices, C = A × B, and write the result to the target address. Matrix multiplication is a fundamental operation in the linear layers of neural networks and the attention mechanism of the Transformer.
 # .insn r 0x7b, 6, 6, rd, rs1, rs2
 gemm       0001110 ..... ..... 110 ..... 1111011 @xg233ai_r
+
+# vadd ：INT32 Vector Element-by-Element Addition¶
+# This function adds two INT32 vectors element-wise and writes the result to the target address. It is used for ResNet skip connections and bias addition in neural networks.
+# .insn r 0x7b, 6, 6, rd, rs1, rs2
+vadd     0011110 ..... ..... 110 ..... 1111011 @xg233ai_r

@@ -238,3 +238,26 @@ static bool trans_gemm(DisasContext *ctx, arg_gemm *a)
 
     return true;
 }
+
+/*
+ * vadd: INT32 vector element-wise addition
+ *
+ * Synopsis: vadd rd, rs1, rs2
+ *   A = mem at gpr[rs1]                           // INT32[16]
+ *   B = mem at gpr[rs2]                           // INT32[16]
+ *   C = mem at gpr[rd]                            // INT32[16]
+ *   for i in 0..15:
+ *       C[i] = A[i] + B[i]                        // INT32 wrapping add
+ */
+static bool trans_vadd(DisasContext *ctx, arg_vadd *a)
+{
+    REQUIRE_XG233AI(ctx);
+
+    TCGv dst_addr = get_gpr(ctx, a->rd, EXT_NONE);
+    TCGv addr_a = get_gpr(ctx, a->rs1, EXT_NONE);
+    TCGv addr_b = get_gpr(ctx, a->rs2, EXT_NONE);
+
+    gen_helper_vadd(tcg_env, dst_addr, addr_a, addr_b);
+
+    return true;
+}

@@ -487,6 +487,31 @@ void helper_gemm(CPURISCVState *env, target_ulong dst_addr,
     }
 }
 
+void helper_vadd(CPURISCVState *env, target_ulong rd, target_ulong rs1, target_ulong rs2)
+{
+    uintptr_t ra = GETPC();
+    int mmu_idx = riscv_env_mmu_index(env, false);
+    int N = 16;
+    target_ulong i;
+
+    /*
+     * vadd: INT32 vector addition
+     *
+     * dst = mem at gpr[rd]                        // INT32 array
+     * src1 = mem at gpr[rs1]                      // INT32 array
+     * src2 = mem at gpr[rs2]                      // INT32 array
+     * N = 16                                    // fixed vector length
+     * for i in 0..N-1:
+     *     dst[i] = src1[i] + src2[i]
+     */
+    for (i = 0; i < N; i++) {
+        int32_t val1 = (int32_t)cpu_ldl_mmuidx_ra(env, rs1 + i * 4, mmu_idx, ra);
+        int32_t val2 = (int32_t)cpu_ldl_mmuidx_ra(env, rs2 + i * 4, mmu_idx, ra);
+        int32_t sum = val1 + val2;
+        cpu_stl_mmuidx_ra(env, rd + i * 4, sum, mmu_idx, ra);
+    }
+}
+
 void helper_cbo_zero(CPURISCVState *env, target_ulong address)
 {
     RISCVCPU *cpu = env_archcpu(env);
